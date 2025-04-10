@@ -1,0 +1,24 @@
+{
+  "name": "minecraft_bot",
+  "version": "0.1.0",
+  "description": "Runs and stops mc servers.",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "bot": "npx tsx src/index.ts"
+  },
+  "author": "Kai Wellby",
+  "license": "ISC",
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "gamedig": "^5.2.0",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "@types/gamedig": "^5.0.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
