@@ -1,5 +1,5 @@
 import { Client, WebhookClient } from "discord.js";
-import type { PlayerEvent } from "./minecraft_server_output";
+import type { PlayerEvent } from "./minecraft-server-output";
 import EventEmitter from "events";
 
 export type DiscordMessage = {

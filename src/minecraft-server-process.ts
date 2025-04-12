@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from "child_process";
 import MinecraftServerMessager from "./minecraft-server-messager";
-import MinecraftServerOutput, { type PlayerEvent } from "./minecraft_server_output";
+import MinecraftServerOutput, { type PlayerEvent } from "./minecraft-server-output";
 import { type QueryResult } from "gamedig";
 import { TypedEventEmitter } from "./util/typed-event-emmiter";
 import type { DiscordMessage } from "./discord-minecraft-chat-webhook";

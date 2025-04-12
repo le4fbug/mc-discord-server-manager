@@ -11,7 +11,7 @@ import {
 	type ColorResolvable,
 } from "discord.js";
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
-import type { PlayerEvent } from "./minecraft_server_output";
+import type { PlayerEvent } from "./minecraft-server-output";
 import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
 
 // Define slash commands
