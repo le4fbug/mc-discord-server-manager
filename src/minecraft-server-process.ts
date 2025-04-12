@@ -3,8 +3,12 @@ import MinecraftServerMessager from "./minecraft-server-messager";
 import MinecraftServerOutput, { type PlayerEvent } from "./minecraft-server-output";
 import { type QueryResult } from "gamedig";
 import { TypedEventEmitter } from "./util/typed-event-emmiter";
-import type { DiscordMessage } from "./discord-minecraft-chat-webhook";
 import CancellableTimeout from "./util/cancellable-timeout";
+
+export type DiscordMessage = {
+	username: string;
+	message: string;
+};
 
 export enum ServerStatus {
 	Down,
@@ -27,7 +31,6 @@ export type ServerStatusInformation = {
 	activeServerInformation: ActiveServerInformation | null;
 };
 
-
 interface ServerStatusEmmitter {
 	serverStatus: (info: ServerStatusInformation) => void;
 	[key: string]: (...args: any[]) => void;
@@ -37,11 +40,11 @@ export default class extends TypedEventEmitter<ServerStatusEmmitter> {
 	private serverStatus: ServerStatus = ServerStatus.Down;
 	private minecraftServerMessager: MinecraftServerMessager | null = null;
 	private internalStatusEmmitter = new TypedEventEmitter<ServerStatusEmmitter>();
-	private emptyServerTimer: CancellableTimeout | null = null
+	private emptyServerTimer: CancellableTimeout | null = null;
 
 	constructor() {
 		super();
-		let shutdownMinutes = process.env.EMPTY_SERVER_SHUTDOWN_MINUTES
+		let shutdownMinutes = process.env.EMPTY_SERVER_SHUTDOWN_MINUTES;
 		if (shutdownMinutes)
 			this.emptyServerTimer = new CancellableTimeout(() => {
 				console.log(`Server has been empty for ${shutdownMinutes} minutes. Shutting down...`);
@@ -110,7 +113,6 @@ export default class extends TypedEventEmitter<ServerStatusEmmitter> {
 	}
 
 	public async start(): Promise<void> {
-
 		if (this.serverStatus === ServerStatus.BootingUp) {
 			throw new Error("Server is already booting up.");
 		}
