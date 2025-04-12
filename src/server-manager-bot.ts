@@ -8,12 +8,11 @@ import {
 	SlashCommandBuilder,
 	TextChannel,
 	Message,
-	WebhookClient,
 	type ColorResolvable,
 } from "discord.js";
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
-import DiscordMinecraftChat, { type DiscordMessage } from "./discord-minecraft-chat";
 import type { PlayerEvent } from "./minecraft_server_output";
+import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
 
 // Define slash commands
 const commands = [
@@ -32,10 +31,35 @@ export default class {
 	});
 
 	private minecraftServerProcess = new MinecraftServerProcess();
-	private discordMinecraftChat = new DiscordMinecraftChat(
-		this.client,
+	private discordMinecraftChatWebhook = new DiscordPlayerEventWebhook(
 		process.env.CHAT_MESSAGES_CHANNEL_ID as string,
-		process.env.CHAT_MESSAGES_CHANNEL_WEBHOOK_URL as string
+		process.env.CHAT_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		"_player",
+		"_player"
+	);
+	private discordDeathMessagesWebhook = new DiscordPlayerEventWebhook(
+		process.env.DEATH_MESSAGES_CHANNEL_ID as string,
+		process.env.DEATH_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		"Death",
+		"https://gcdnb.pbrd.co/images/K5NnkpebVt14.png?o=1"
+	);
+	private discordAchievementMessagesWebhook = new DiscordPlayerEventWebhook(
+		process.env.ACHIEVEMENT_MESSAGES_CHANNEL_ID as string,
+		process.env.ACHIEVEMENT_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		"Achievement",
+		"https://gcdnb.pbrd.co/images/fqJC7fcj4Cjm.png?o=1"
+	);
+	private discordJoinMessagesWebhook = new DiscordPlayerEventWebhook(
+		process.env.JOIN_MESSAGES_CHANNEL_ID as string,
+		process.env.JOIN_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		"Join",
+		"https://gcdnb.pbrd.co/images/6hM5kPfahimb.png?o=1"
+	);
+	private discordLeaveMessagesWebhook = new DiscordPlayerEventWebhook(
+		process.env.LEAVE_MESSAGES_CHANNEL_ID as string,
+		process.env.LEAVE_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		"Leave",
+		"https://gcdnb.pbrd.co/images/9YEfFRJPVEEG.png?o=1"
 	);
 	private serverActivityMessage: Message | null = null;
 
@@ -58,10 +82,19 @@ export default class {
 		})();
 
 		this.minecraftServerProcess.on("chat", (chatEvent: PlayerEvent) =>
-			this.discordMinecraftChat.onMinecraftChat(chatEvent)
+			this.discordMinecraftChatWebhook.onEvent(chatEvent)
 		);
-		this.discordMinecraftChat.on("discordMessage", (discordMessage: DiscordMessage) =>
-			this.minecraftServerProcess.sendDiscordMessage(discordMessage)
+		this.minecraftServerProcess.on("death", (chatEvent: PlayerEvent) =>
+			this.discordDeathMessagesWebhook.onEvent(chatEvent)
+		);
+		this.minecraftServerProcess.on("achievement", (chatEvent: PlayerEvent) =>
+			this.discordAchievementMessagesWebhook.onEvent(chatEvent)
+		);
+		this.minecraftServerProcess.on("join", (chatEvent: PlayerEvent) =>
+			this.discordJoinMessagesWebhook.onEvent(chatEvent)
+		);
+		this.minecraftServerProcess.on("leave", (chatEvent: PlayerEvent) =>
+			this.discordLeaveMessagesWebhook.onEvent(chatEvent)
 		);
 	}
 
@@ -81,23 +114,36 @@ export default class {
 					color = "#FF0000"; // Red
 					break;
 				case ServerStatus.SchedulingShutdown:
-					statusMessage = "Server is scheduled to shutdown";
+					statusMessage = "Server is scheduled to shut down";
 					color = "#FFA500"; // Orange
 					break;
 				case ServerStatus.ShuttingDown:
-					statusMessage = "Server is shutting down.";
+					statusMessage = "Server is shutting down";
 					color = "#FF6347"; // Tomato red
+					break;
+				case ServerStatus.SchedulingBootup:
+					statusMessage = "Server is scheduled to boot up";
+					color = "#ADD8E6"; // Light blue
 					break;
 				case ServerStatus.BootingUp:
 					statusMessage = "Server is booting up";
 					color = "#1E90FF"; // Dodger blue
 					break;
 				case ServerStatus.Up:
-					statusMessage = "Server is online.";
-					color = "#00FF7F"; // Spring green
+					if (
+						serverInformation.activeServerInformation?.playersActive == 0 &&
+						process.env.EMPTY_SERVER_SHUTDOWN_MINUTES
+					) {
+						// For when empty server stopper is active and set up in settings
+						statusMessage = `${process.env.EMPTY_SERVER_SHUTDOWN_MINUTES} minute empty server shutdown timer currently running`;
+						color = "#FFFF8F"; // Canary Yellow
+					} else {
+						statusMessage = "Server is online";
+						color = "#00FF7F"; // Spring green
+					}
 					break;
 				default:
-					statusMessage = "Unknown server status.";
+					statusMessage = "Unknown server status";
 					color = "#808080"; // Gray
 					break;
 			}
@@ -155,7 +201,7 @@ export default class {
 					embeds: [statusEmbed],
 				});
 			} else {
-				console.error("❌ Channel not found or not a text-based channel.");
+				console.error("Channel not found or not a text-based channel.");
 			}
 		});
 
@@ -167,28 +213,28 @@ export default class {
 
 			// Command to start the Minecraft server
 			if (commandName === "start") {
-				await interaction.reply("Starting Minecraft server, please wait...");
-				this.minecraftServerProcess
-					.start()
-					.then(() => {
-						interaction.editReply("Server is now up.");
-					})
-					.catch((error) => {
-						interaction.editReply(error);
-					});
+				try {
+					await interaction.deferReply(); // Defers the response (gives you more time)
+
+					await this.minecraftServerProcess.start();
+
+					await interaction.editReply("Server is now up.");
+				} catch (error) {
+					await interaction.editReply(`Failed to start server: ${error}`);
+				}
 			}
 
 			// Command to stop the Minecraft server
 			else if (commandName === "stop") {
-				await interaction.reply("Stopping Minecraft server...");
-				this.minecraftServerProcess
-					.stop()
-					.then((message: string) => {
-						interaction.editReply(message);
-					})
-					.catch((error) => {
-						interaction.editReply(error);
-					});
+				try {
+					await interaction.deferReply(); // Defers the response (gives you more time)
+
+					await this.minecraftServerProcess.stop();
+
+					await interaction.editReply("Server successfully shutdown.");
+				} catch (error) {
+					await interaction.editReply(`Failed to stop server: ${error}`);
+				}
 			}
 
 			// Command to check server status
@@ -223,15 +269,23 @@ export default class {
 			}
 		});
 
+		// Sends discord messages to mc server from specific chat channel
+		this.client.on("messageCreate", (message) => {
+			if (message.author.bot) return;
+			if (message.webhookId) return;
+			if (message.channelId !== process.env.CHAT_MESSAGES_CHANNEL_ID) return;
+
+			this.minecraftServerProcess.sendDiscordMessage({
+				username: message.author.username,
+				message: message.cleanContent,
+			});
+		});
+
 		process.on("exit", async () => {
-			console.log("Terminating...");
 			if (this.serverActivityMessage) {
 				try {
 					await this.serverActivityMessage.delete();
-					console.log("Message deleted successfully.");
-				} catch (error) {
-					console.error("Error deleting the message:", error);
-				}
+				} catch (error) {}
 			}
 		});
 

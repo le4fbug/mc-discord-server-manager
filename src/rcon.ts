@@ -1,5 +1,6 @@
 import net from "net";
 import { Buffer } from "buffer";
+import RetryLoop from "./util/retry-loop";
 
 enum RconPacketType {
 	AUTH = 3,
@@ -14,21 +15,27 @@ export default class {
 	private host: string;
 	private port: number;
 	private password: string;
+	private retryLoop;
 
 	constructor(host: string, port: number, password: string) {
 		this.host = host;
 		this.port = port;
 		this.password = password;
+		this.retryLoop = new RetryLoop(() => this.tryConnect(), 3000);
 	}
 
-	public connect(): Promise<void> {
+	private tryConnect(): Promise<void> {
 		return new Promise((resolve, reject) => {
+			this.cleanupSocket();
 			this.socket = net.createConnection(this.port, this.host, () => {
 				this.authenticate().then(resolve).catch(reject);
 			});
-
 			this.socket.on("error", reject);
 		});
+	}
+
+	public connect(): Promise<void> {
+		return this.retryLoop.run();
 	}
 
 	private authenticate(): Promise<void> {
@@ -70,7 +77,6 @@ export default class {
 			this.socket.once("data", (data) => {
 				const length = data.readInt32LE(0);
 				const responseId = data.readInt32LE(4);
-				const responseType = data.readInt32LE(8);
 				const responseBody = data.toString("utf8", 12, 4 + length - 2); // remove last 2 nulls
 
 				resolve({ id: responseId, body: responseBody });
@@ -80,10 +86,15 @@ export default class {
 		});
 	}
 
-	public disconnect(): void {
+	private cleanupSocket(): void {
 		if (this.socket) {
-			this.socket.end();
+			this.socket.destroy();
 			this.socket = null;
 		}
+	}
+
+	public disconnect(): void {
+		this.retryLoop.cancel();
+		this.cleanupSocket();
 	}
 }

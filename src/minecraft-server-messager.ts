@@ -1,18 +1,36 @@
 import EventEmitter from "events";
 import { GameDig, type QueryResult } from "gamedig";
 import Rcon from "./rcon";
+import RetryLoop from "./util/retry-loop";
 
 export default class MinecraftServerMessager extends EventEmitter {
 	private rcon = new Rcon("localhost", 25575, "123");
 	private isInitialConnectionEstablished: boolean = false;
 	private isDestroyed: boolean = false;
+	private stopRetryLoop: RetryLoop<void>;
 
 	constructor() {
 		super();
+		this.stopRetryLoop = new RetryLoop(
+			() =>
+				new Promise<void>(async (resolve, reject) => {
+					{
+						try {
+							let response: string = await this.sendCommand("stop");
+							if (response) resolve();
+							else reject();
+						} catch (error) {
+							reject(error);
+						}
+					}
+				}),
+			3000
+		);
 	}
 
 	public start(): Promise<QueryResult> {
-		return new Promise((resolve, reject) => {
+		return new Promise(async (resolve, reject) => {
+			await this.rcon.connect();
 			const serverListenerStart = async () => {
 				try {
 					const serverProperties = await GameDig.query({
@@ -43,8 +61,13 @@ export default class MinecraftServerMessager extends EventEmitter {
 		return this.rcon.sendCommand(command);
 	}
 
+	public sendStop(): Promise<void> {
+		return this.stopRetryLoop.run();
+	}
+
 	public destroy(): void {
 		this.isDestroyed = true;
+		this.stopRetryLoop.cancel();
 		this.rcon.disconnect();
 	}
 }
