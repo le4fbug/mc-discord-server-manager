@@ -13,6 +13,7 @@ import {
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
 import type { PlayerEvent } from "./minecraft-server-output";
 import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
+import { Config } from "./config";
 
 // Define slash commands
 const commands = [
@@ -32,32 +33,32 @@ export default class {
 
 	private minecraftServerProcess = new MinecraftServerProcess();
 	private discordMinecraftChatWebhook = new DiscordPlayerEventWebhook(
-		process.env.CHAT_MESSAGES_CHANNEL_ID as string,
-		process.env.CHAT_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		Config.CHAT_MESSAGES_CHANNEL_ID,
+		Config.CHAT_MESSAGES_CHANNEL_WEBHOOK_URL,
 		"_player",
 		"_player"
 	);
 	private discordDeathMessagesWebhook = new DiscordPlayerEventWebhook(
-		process.env.DEATH_MESSAGES_CHANNEL_ID as string,
-		process.env.DEATH_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		Config.DEATH_MESSAGES_CHANNEL_ID,
+		Config.DEATH_MESSAGES_CHANNEL_WEBHOOK_URL,
 		"Death",
 		"https://gcdnb.pbrd.co/images/K5NnkpebVt14.png?o=1"
 	);
 	private discordAchievementMessagesWebhook = new DiscordPlayerEventWebhook(
-		process.env.ACHIEVEMENT_MESSAGES_CHANNEL_ID as string,
-		process.env.ACHIEVEMENT_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		Config.ACHIEVEMENT_MESSAGES_CHANNEL_ID,
+		Config.ACHIEVEMENT_MESSAGES_CHANNEL_WEBHOOK_URL,
 		"Achievement",
 		"https://gcdnb.pbrd.co/images/fqJC7fcj4Cjm.png?o=1"
 	);
 	private discordJoinMessagesWebhook = new DiscordPlayerEventWebhook(
-		process.env.JOIN_MESSAGES_CHANNEL_ID as string,
-		process.env.JOIN_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		Config.JOIN_MESSAGES_CHANNEL_ID,
+		Config.JOIN_MESSAGES_CHANNEL_WEBHOOK_URL,
 		"Join",
 		"https://gcdnb.pbrd.co/images/6hM5kPfahimb.png?o=1"
 	);
 	private discordLeaveMessagesWebhook = new DiscordPlayerEventWebhook(
-		process.env.LEAVE_MESSAGES_CHANNEL_ID as string,
-		process.env.LEAVE_MESSAGES_CHANNEL_WEBHOOK_URL as string,
+		Config.LEAVE_MESSAGES_CHANNEL_ID,
+		Config.LEAVE_MESSAGES_CHANNEL_WEBHOOK_URL,
 		"Leave",
 		"https://gcdnb.pbrd.co/images/9YEfFRJPVEEG.png?o=1"
 	);
@@ -65,15 +66,14 @@ export default class {
 
 	constructor() {
 		// Register commands using your preferred method (separate from the client initialization)
-		const rest = new REST({ version: "10" }).setToken(process.env.TOKEN as string);
+		const rest = new REST({ version: "10" }).setToken(Config.TOKEN as string);
 		(async () => {
 			try {
 				console.log("Registering slash commands...");
 
-				await rest.put(
-					Routes.applicationGuildCommands(process.env.CLIENT_ID as string, process.env.GUILD_ID as string),
-					{ body: commands }
-				);
+				await rest.put(Routes.applicationGuildCommands(Config.CLIENT_ID as string, Config.GUILD_ID as string), {
+					body: commands,
+				});
 
 				console.log("Slash commands were registered successfully!");
 			} catch (error) {
@@ -132,10 +132,10 @@ export default class {
 				case ServerStatus.Up:
 					if (
 						serverInformation.activeServerInformation?.playersActive == 0 &&
-						process.env.EMPTY_SERVER_SHUTDOWN_MINUTES
+						Config.EMPTY_SERVER_SHUTDOWN_MINUTES
 					) {
 						// For when empty server stopper is active and set up in settings
-						statusMessage = `${process.env.EMPTY_SERVER_SHUTDOWN_MINUTES} minute empty server shutdown timer currently running`;
+						statusMessage = `${Config.EMPTY_SERVER_SHUTDOWN_MINUTES} minute empty server shutdown timer currently running`;
 						color = "#FFFF8F"; // Canary Yellow
 					} else {
 						statusMessage = "Server is online";
@@ -188,7 +188,7 @@ export default class {
 		this.client.once("ready", async () => {
 			console.log(`Logged in as ${this.client.user?.tag}!`);
 			this.client.user?.setActivity("Minecraft Server Manager");
-			const channel = await this.client.channels.fetch(process.env.SERVER_STATUS_CHANNEL_ID as string);
+			const channel = await this.client.channels.fetch(Config.SERVER_STATUS_CHANNEL_ID as string);
 			if (channel && channel.isTextBased()) {
 				let textChannel = channel as TextChannel;
 				const statusEmbed = new EmbedBuilder()
@@ -273,7 +273,7 @@ export default class {
 		this.client.on("messageCreate", (message) => {
 			if (message.author.bot) return;
 			if (message.webhookId) return;
-			if (message.channelId !== process.env.CHAT_MESSAGES_CHANNEL_ID) return;
+			if (message.channelId !== Config.CHAT_MESSAGES_CHANNEL_ID) return;
 
 			this.minecraftServerProcess.sendDiscordMessage({
 				username: message.author.username,
@@ -290,6 +290,6 @@ export default class {
 		});
 
 		// Login to Discord with the token
-		this.client.login(process.env.TOKEN as string);
+		this.client.login(Config.TOKEN as string);
 	}
 }

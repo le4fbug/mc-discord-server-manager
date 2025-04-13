@@ -70,7 +70,7 @@ export default class extends EventEmitter {
 			this.emit("achievement", { player, message } as PlayerEvent);
 			return;
 		}
-		
+
 		const player = this.playerList.find((playerName) => line.includes(playerName));
 		if (!player) return;
 

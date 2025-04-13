@@ -4,6 +4,7 @@ import MinecraftServerOutput, { type PlayerEvent } from "./minecraft-server-outp
 import { type QueryResult } from "gamedig";
 import { TypedEventEmitter } from "./util/typed-event-emmiter";
 import CancellableTimeout from "./util/cancellable-timeout";
+import { Config } from "./config";
 
 export type DiscordMessage = {
 	username: string;
@@ -44,12 +45,12 @@ export default class extends TypedEventEmitter<ServerStatusEmmitter> {
 
 	constructor() {
 		super();
-		let shutdownMinutes = process.env.EMPTY_SERVER_SHUTDOWN_MINUTES;
+		let shutdownMinutes = Config.EMPTY_SERVER_SHUTDOWN_MINUTES;
 		if (shutdownMinutes)
 			this.emptyServerTimer = new CancellableTimeout(() => {
 				console.log(`Server has been empty for ${shutdownMinutes} minutes. Shutting down...`);
 				this.stop();
-			}, Number(process.env.EMPTY_SERVER_SHUTDOWN_MINUTES) * 60 * 1000);
+			}, Number(Config.EMPTY_SERVER_SHUTDOWN_MINUTES) * 60 * 1000);
 	}
 
 	private setServerStatus(serverStatus: ServerStatus, gameDigQuery?: QueryResult) {
@@ -140,13 +141,13 @@ export default class extends TypedEventEmitter<ServerStatusEmmitter> {
 
 		this.setServerStatus(ServerStatus.BootingUp);
 
-		process.chdir(process.env.SERVER_PATH!);
+		process.chdir(Config.SERVER_PATH!);
 
 		const javaArgs: string[] = [
-			`-Xmx${process.env.SERVER_MEMORY}`,
-			`-Xms${process.env.SERVER_MEMORY}`,
+			`-Xmx${Config.SERVER_MEMORY}`,
+			`-Xms${Config.SERVER_MEMORY}`,
 			"-jar",
-			process.env.SERVER_JAR_FILE!,
+			Config.SERVER_JAR_FILE!,
 			"nogui",
 		];
 

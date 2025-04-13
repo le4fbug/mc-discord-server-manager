@@ -1,3 +1,4 @@
 .env
+bot.properties
 node_modules
 package-lock.json

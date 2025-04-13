@@ -9,8 +9,7 @@ export default class CancellableTimeout {
 	}
 
 	public start() {
-		if (this.timeoutId)
-			return
+		if (this.timeoutId) return;
 
 		this.timeoutId = setTimeout(() => {
 			this.callback();
@@ -18,8 +17,8 @@ export default class CancellableTimeout {
 	}
 
 	public restart() {
-		this.cancel()
-		this.start()
+		this.cancel();
+		this.start();
 	}
 
 	public cancel() {
@@ -30,6 +29,6 @@ export default class CancellableTimeout {
 	}
 
 	public isRunning(): boolean {
-		return this.timeoutId ? true : false
+		return this.timeoutId ? true : false;
 	}
 }

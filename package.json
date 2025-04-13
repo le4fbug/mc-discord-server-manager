@@ -13,11 +13,14 @@
     "child_process": "^1.0.2",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
+    "fs": "^0.0.1-security",
     "gamedig": "^5.2.0",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "properties-reader": "^2.3.0"
   },
   "devDependencies": {
     "@types/gamedig": "^5.0.3",
+    "@types/properties-reader": "^2.1.3",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
