@@ -1,18 +1,8 @@
-import {
-	Client,
-	GatewayIntentBits,
-	Partials,
-	EmbedBuilder,
-	REST,
-	Routes,
-	SlashCommandBuilder,
-	TextChannel,
-	Message,
-	type ColorResolvable,
-} from "discord.js";
+import { Client, GatewayIntentBits, Partials, EmbedBuilder, REST, Routes, SlashCommandBuilder } from "discord.js";
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
 import type { PlayerEvent } from "./minecraft-server-output";
 import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
+import discordServerStatusWebhook from "./discord-server-status-webhook";
 import { Config } from "./config";
 
 // Define slash commands
@@ -34,35 +24,39 @@ export default class {
 	private minecraftServerProcess = new MinecraftServerProcess();
 	private discordMinecraftChatWebhook = new DiscordPlayerEventWebhook(
 		Config.CHAT_MESSAGES_CHANNEL_ID,
-		Config.CHAT_MESSAGES_CHANNEL_WEBHOOK_URL,
+		Config.CHAT_MESSAGES_WEBHOOK_URL,
 		"_player",
 		"_player"
 	);
 	private discordDeathMessagesWebhook = new DiscordPlayerEventWebhook(
 		Config.DEATH_MESSAGES_CHANNEL_ID,
-		Config.DEATH_MESSAGES_CHANNEL_WEBHOOK_URL,
+		Config.DEATH_MESSAGES_WEBHOOK_URL,
 		"Death",
 		"https://gcdnb.pbrd.co/images/K5NnkpebVt14.png?o=1"
 	);
 	private discordAchievementMessagesWebhook = new DiscordPlayerEventWebhook(
 		Config.ACHIEVEMENT_MESSAGES_CHANNEL_ID,
-		Config.ACHIEVEMENT_MESSAGES_CHANNEL_WEBHOOK_URL,
+		Config.ACHIEVEMENT_MESSAGES_WEBHOOK_URL,
 		"Achievement",
 		"https://gcdnb.pbrd.co/images/fqJC7fcj4Cjm.png?o=1"
 	);
 	private discordJoinMessagesWebhook = new DiscordPlayerEventWebhook(
 		Config.JOIN_MESSAGES_CHANNEL_ID,
-		Config.JOIN_MESSAGES_CHANNEL_WEBHOOK_URL,
+		Config.JOIN_MESSAGES_WEBHOOK_URL,
 		"Join",
 		"https://gcdnb.pbrd.co/images/6hM5kPfahimb.png?o=1"
 	);
 	private discordLeaveMessagesWebhook = new DiscordPlayerEventWebhook(
 		Config.LEAVE_MESSAGES_CHANNEL_ID,
-		Config.LEAVE_MESSAGES_CHANNEL_WEBHOOK_URL,
+		Config.LEAVE_MESSAGES_WEBHOOK_URL,
 		"Leave",
 		"https://gcdnb.pbrd.co/images/9YEfFRJPVEEG.png?o=1"
 	);
-	private serverActivityMessage: Message | null = null;
+	private serverStatusWebhook = new discordServerStatusWebhook(
+		Config.SERVER_STATUS_CHANNEL_ID,
+		Config.SERVER_STATUS_WEBHOOK_URL,
+		"Server"
+	);
 
 	constructor() {
 		// Register commands using your preferred method (separate from the client initialization)
@@ -100,109 +94,13 @@ export default class {
 
 	public login() {
 		this.minecraftServerProcess.on("serverStatus", (serverInformation: ServerStatusInformation) => {
-			if (!this.serverActivityMessage) return;
-
-			const baseEmbed = this.serverActivityMessage.embeds[0]
-				? EmbedBuilder.from(this.serverActivityMessage.embeds[0])
-				: new EmbedBuilder();
-
-			let statusMessage: string = "";
-			let color: ColorResolvable;
-			switch (serverInformation.status) {
-				case ServerStatus.Down:
-					statusMessage = "Server is offline";
-					color = "#FF0000"; // Red
-					break;
-				case ServerStatus.SchedulingShutdown:
-					statusMessage = "Server is scheduled to shut down";
-					color = "#FFA500"; // Orange
-					break;
-				case ServerStatus.ShuttingDown:
-					statusMessage = "Server is shutting down";
-					color = "#FF6347"; // Tomato red
-					break;
-				case ServerStatus.SchedulingBootup:
-					statusMessage = "Server is scheduled to boot up";
-					color = "#ADD8E6"; // Light blue
-					break;
-				case ServerStatus.BootingUp:
-					statusMessage = "Server is booting up";
-					color = "#1E90FF"; // Dodger blue
-					break;
-				case ServerStatus.Up:
-					if (
-						serverInformation.activeServerInformation?.playersActive == 0 &&
-						Config.EMPTY_SERVER_SHUTDOWN_MINUTES
-					) {
-						// For when empty server stopper is active and set up in settings
-						statusMessage = `${Config.EMPTY_SERVER_SHUTDOWN_MINUTES} minute empty server shutdown timer currently running`;
-						color = "#FFFF8F"; // Canary Yellow
-					} else {
-						statusMessage = "Server is online";
-						color = "#00FF7F"; // Spring green
-					}
-					break;
-				default:
-					statusMessage = "Unknown server status";
-					color = "#808080"; // Gray
-					break;
-			}
-
-			let updatedEmbed = new EmbedBuilder()
-				.setTitle("Minecraft Server Status")
-				.setDescription(statusMessage)
-				.setColor(color)
-				.setTimestamp();
-
-			if (serverInformation.activeServerInformation)
-				updatedEmbed = updatedEmbed.addFields(
-					{
-						name: "Version",
-						value: serverInformation.activeServerInformation.version,
-						inline: false,
-					},
-					{
-						name: "Player Count",
-						value:
-							serverInformation.activeServerInformation.playersActive.toString() +
-							" / " +
-							serverInformation.activeServerInformation.maxPlayers.toString(),
-						inline: false,
-					},
-					{
-						name: "Online Players",
-						value:
-							serverInformation.activeServerInformation.playersActive > 0
-								? serverInformation.activeServerInformation.playerList
-										.map((name, i) => `${i + 1}. ${name}`)
-										.join("\n")
-								: "No players online",
-						inline: false,
-					}
-				);
-
-			this.serverActivityMessage.edit({ embeds: [updatedEmbed] });
+			this.serverStatusWebhook.onStatusUpdates(serverInformation);
 		});
 
 		// Log when the bot is ready
 		this.client.once("ready", async () => {
 			console.log(`Logged in as ${this.client.user?.tag}!`);
 			this.client.user?.setActivity("Minecraft Server Manager");
-			const channel = await this.client.channels.fetch(Config.SERVER_STATUS_CHANNEL_ID as string);
-			if (channel && channel.isTextBased()) {
-				let textChannel = channel as TextChannel;
-				const statusEmbed = new EmbedBuilder()
-					.setTitle("Minecraft Server Status")
-					.setDescription("Server is currently down.")
-					.setColor("#FF0000")
-					.setTimestamp();
-
-				this.serverActivityMessage = await textChannel.send({
-					embeds: [statusEmbed],
-				});
-			} else {
-				console.error("Channel not found or not a text-based channel.");
-			}
 		});
 
 		// Handle slash command interactions
@@ -281,13 +179,7 @@ export default class {
 			});
 		});
 
-		process.on("exit", async () => {
-			if (this.serverActivityMessage) {
-				try {
-					await this.serverActivityMessage.delete();
-				} catch (error) {}
-			}
-		});
+		process.on("exit", async () => this.serverStatusWebhook.destroy());
 
 		// Login to Discord with the token
 		this.client.login(Config.TOKEN as string);
