@@ -1,15 +1,15 @@
 import { spawn, ChildProcess } from "child_process";
 import MinecraftServerMessager from "./minecraft-server-messager";
-import MinecraftServerOutput, { type PlayerEvent } from "./minecraft-server-output";
+import MinecraftServerOutput, { type PlayerEvent, type ServerOutputEmitter } from "./minecraft-server-output";
 import { type QueryResult } from "gamedig";
-import { TypedEventEmitter } from "./util/typed-event-emmiter";
+import TypedEventEmitter from "./util/typed-event-emitter";
 import CancellableTimeout from "./util/cancellable-timeout";
 import { Config } from "./config";
 
-export type DiscordMessage = {
+export interface DiscordMessage {
 	username: string;
 	message: string;
-};
+}
 
 export enum ServerStatus {
 	Down,
@@ -20,27 +20,28 @@ export enum ServerStatus {
 	Up,
 }
 
-export type ActiveServerInformation = {
+export interface ActiveServerInformation {
 	playersActive: number;
 	playerList: string[];
 	maxPlayers: number;
 	version: string;
-};
-
-export type ServerStatusInformation = {
-	status: ServerStatus;
-	activeServerInformation: ActiveServerInformation | null;
-};
-
-interface ServerStatusEmmitter {
-	serverStatus: (info: ServerStatusInformation) => void;
-	[key: string]: (...args: any[]) => void;
 }
 
-export default class extends TypedEventEmitter<ServerStatusEmmitter> {
+export interface ServerStatusInformation {
+	status: ServerStatus;
+	activeServerInformation: ActiveServerInformation | null;
+}
+
+interface ServerStatusEmitter {
+	serverStatus: (info: ServerStatusInformation) => void;
+}
+
+interface ServerProcessEmitter extends ServerStatusEmitter, ServerOutputEmitter {}
+
+export default class extends TypedEventEmitter<ServerProcessEmitter> {
 	private serverStatus: ServerStatus = ServerStatus.Down;
 	private minecraftServerMessager: MinecraftServerMessager | null = null;
-	private internalStatusEmmitter = new TypedEventEmitter<ServerStatusEmmitter>();
+	private internalStatusEmmitter = new TypedEventEmitter<ServerStatusEmitter>();
 	private emptyServerTimer: CancellableTimeout | null = null;
 
 	constructor() {

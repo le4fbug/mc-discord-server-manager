@@ -1,24 +1,21 @@
 import { Readable } from "stream";
-import { EventEmitter } from "events";
 import readline from "readline";
+import TypedEventEmitter from "./util/typed-event-emitter";
 
 export interface PlayerEvent {
 	player: string;
 	message: string;
 }
 
-export interface MinecraftMessageEvents {
+export interface ServerOutputEmitter {
 	chat: (event: PlayerEvent) => void;
 	join: (event: PlayerEvent) => void;
 	leave: (event: PlayerEvent) => void;
 	achievement: (event: PlayerEvent) => void;
 	death: (event: PlayerEvent) => void;
-	raw: (outputLine: string) => void;
 }
 
-export type MinecraftMessageEvent = keyof MinecraftMessageEvents;
-
-export default class extends EventEmitter {
+export default class extends TypedEventEmitter<ServerOutputEmitter> {
 	private playerList: string[] = [];
 
 	constructor(stream: Readable | null) {
@@ -81,16 +78,5 @@ export default class extends EventEmitter {
 
 		const message = line.split(/\[Server thread\/INFO\]: /i)[1];
 		if (message) this.emit("death", { player, message } as PlayerEvent);
-	}
-
-	override on<U extends MinecraftMessageEvent>(event: U, listener: MinecraftMessageEvents[U]): this {
-		return super.on(event, listener);
-	}
-
-	override emit<U extends MinecraftMessageEvent>(
-		event: U,
-		payload: Parameters<MinecraftMessageEvents[U]>[0]
-	): boolean {
-		return super.emit(event, payload);
 	}
 }
