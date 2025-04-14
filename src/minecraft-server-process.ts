@@ -6,6 +6,7 @@ import TypedEventEmitter from "./util/typed-event-emitter";
 import CancellableTimeout from "./util/cancellable-timeout";
 import PropertiesReader from "properties-reader";
 import path from "path";
+import fs from 'fs';
 
 export interface DiscordMessage {
 	username: string;
@@ -46,19 +47,22 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 	private emptyServerTimer: CancellableTimeout | null = null;
 	private serverPath: string | null;
 	private serverJarFileName: string | null;
-	private serverMemory: string;
+	private serverMinMemory: string | undefined;
+	private serverMaxMemory: string | undefined;
 
 	constructor(
 		serverPath: string | null,
 		serverJarFileName: string | null,
-		serverMemory: string,
+		serverMinMemory: string | undefined,
+		serverMaxMemory: string | undefined,
 		emptyServerShutdownMinutes: number | null
 	) {
 		super();
 
 		this.serverPath = serverPath;
 		this.serverJarFileName = serverJarFileName;
-		this.serverMemory = serverMemory;
+		this.serverMinMemory = serverMinMemory;
+		this.serverMaxMemory = serverMaxMemory;
 
 		if (emptyServerShutdownMinutes)
 			this.emptyServerTimer = new CancellableTimeout(() => {
@@ -155,17 +159,19 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 
 		this.setServerStatus(ServerStatus.BootingUp);
 
-		process.chdir(this.serverPath!);
-
-		const javaArgs: string[] = [
-			`-Xmx${this.serverMemory}`,
-			`-Xms${this.serverMemory}`,
-			"-jar",
-			this.serverJarFileName ? this.serverJarFileName : "server.jar",
-			"nogui",
-		];
-
-		const minecraftServerProcess: ChildProcess = spawn("java", javaArgs);
+		if (this.serverPath) process.chdir(this.serverPath);
+	
+		let javaArgs: string[] = [];
+		const jarFileName = this.serverJarFileName ? this.serverJarFileName : "server.jar";
+		const jarFilePath = path.resolve(this.serverPath ?? ".", jarFileName)
+		const doesJarFileExist = fs.existsSync(jarFilePath);
+		if (!doesJarFileExist) throw new Error(jarFilePath + " does not exist. Please check the server-path and server-jar-file is correct in bot properties.");
+			
+		if (this.serverMaxMemory) javaArgs.push(`-Xmx${this.serverMaxMemory}`);
+		if (this.serverMinMemory) javaArgs.push(`-Xms${this.serverMinMemory}`);
+		javaArgs.push("-jar");
+		javaArgs.push(jarFileName);
+		javaArgs.push("nogui");
 
 		const propertiesPath = path.resolve(this.serverPath ?? ".", "server.properties");
 		const properties = PropertiesReader(propertiesPath);
@@ -190,17 +196,14 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 			this.setServerStatus(this.serverStatus, gameDigQuery);
 		});
 
-		if (minecraftServerProcess.stdout) {
-			minecraftServerProcess.stdout.on("data", (data) => {
-				console.log(`[SERVER] ${data.toString()}`);
-			});
-		}
+		const minecraftServerProcess: ChildProcess = spawn("java", javaArgs);
 
-		if (minecraftServerProcess.stderr) {
-			minecraftServerProcess.stderr.on("data", (data) => {
-				console.error(`[SERVER ERROR] ${data.toString()}`);
-			});
-		}
+		minecraftServerProcess.stdout?.on("data", (data) => {
+			console.log(`[SERVER] ${data.toString()}`);
+		});
+		minecraftServerProcess.stderr?.on("data", (data) => {
+			console.error(`[SERVER ERROR] ${data.toString()}`);
+		});
 
 		const minecraftServerOutput = new MinecraftServerOutput(minecraftServerProcess.stdout);
 		minecraftServerOutput.on("chat", (chatEvent: PlayerEvent) => this.emit("chat", chatEvent));
@@ -209,19 +212,24 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 		minecraftServerOutput.on("join", (chatEvent: PlayerEvent) => this.emit("join", chatEvent));
 		minecraftServerOutput.on("leave", (chatEvent: PlayerEvent) => this.emit("leave", chatEvent));
 
-		minecraftServerProcess.on("close", (code) => {
-			console.log(`Minecraft server process exited with code ${code}`);
-			this.minecraftServerMessager?.destroy();
-			this.minecraftServerMessager = null;
-			this.setServerStatus(ServerStatus.Down);
+		const earlyExit = new Promise<never>((_, reject) => {
+			minecraftServerProcess.once("close", (code) => {
+				console.log(`Minecraft server process exited with code ${code}`);
+				this.minecraftServerMessager?.destroy();
+				this.minecraftServerMessager = null;
+				this.setServerStatus(ServerStatus.Down);
+				if (code == 0)
+					reject(new Error("Minecraft server shut down during boot up."));
+				else
+					reject(new Error("Minecraft server crashed during boot up."));
+			});
 		});
 
-		try {
-			const gameDigQuery = await this.minecraftServerMessager?.start();
+		const serverReady = this.minecraftServerMessager?.start().then((gameDigQuery) => {
 			this.setServerStatus(ServerStatus.Up, gameDigQuery);
-		} catch (error) {
-			throw error;
-		}
+		});
+
+		await Promise.race([earlyExit, serverReady]);
 	}
 
 	public async stop(): Promise<string> {

@@ -25,7 +25,8 @@ const CONFIG_KEYS = [
 	// Server config
 	"SERVER_PATH",
 	"SERVER_JAR_FILE",
-	"SERVER_MEMORY",
+	"SERVER_MAX_MEMORY",
+	"SERVER_MIN_MEMORY",
 	"EMPTY_SERVER_SHUTDOWN_MINUTES",
 ];
 
@@ -53,14 +54,9 @@ function getConfigValue(key: string): string | undefined {
 	const propertiesKey = toKebabCase(key);
 
 	// Check .env first
-	console.log(process.env[propertiesKey]);
 	if (process.env[propertiesKey] !== "" && process.env[propertiesKey] !== undefined) return process.env[propertiesKey];
-	console.log('underinfeddfafsdf')
-
 	// Try .properties using lower-case dash format (e.g., SERVER_PATH -> server-path)
 	const value = properties.get(propertiesKey);
-	console.log(value)
-	console.log(propertiesKey);
 
 	return value ? String(value) : undefined;
 }

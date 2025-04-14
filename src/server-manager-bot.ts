@@ -25,7 +25,8 @@ export default class {
 	private minecraftServerProcess = new MinecraftServerProcess(
 		Config.SERVER_PATH ?? null,
 		Config.SERVER_JAR_FILE ?? null,
-		Config.SERVER_MEMORY as string,
+		Config.SERVER_MIN_MEMORY,
+		Config.SERVER_MAX_MEMORY,
 		Config.EMPTY_SERVER_SHUTDOWN_MINUTES ? Number(Config.EMPTY_SERVER_SHUTDOWN_MINUTES) : null
 	);
 	private discordMinecraftChatWebhook = new DiscordPlayerEventWebhook(
@@ -124,7 +125,7 @@ export default class {
 
 					await interaction.editReply("Server is now up.");
 				} catch (error) {
-					await interaction.editReply(`Failed to start server: ${error}`);
+					await interaction.editReply(`Failed to start server: ${error instanceof Error ? error.message : error}`);
 				}
 			}
 
