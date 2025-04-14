@@ -4,7 +4,8 @@ import MinecraftServerOutput, { type PlayerEvent, type ServerOutputEmitter } fro
 import { type QueryResult } from "gamedig";
 import TypedEventEmitter from "./util/typed-event-emitter";
 import CancellableTimeout from "./util/cancellable-timeout";
-import { Config } from "./config";
+import PropertiesReader from "properties-reader";
+import path from "path";
 
 export interface DiscordMessage {
 	username: string;
@@ -43,15 +44,27 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 	private minecraftServerMessager: MinecraftServerMessager | null = null;
 	private internalStatusEmmitter = new TypedEventEmitter<ServerStatusEmitter>();
 	private emptyServerTimer: CancellableTimeout | null = null;
+	private serverPath: string | null;
+	private serverJarFileName: string | null;
+	private serverMemory: string;
 
-	constructor() {
+	constructor(
+		serverPath: string | null,
+		serverJarFileName: string | null,
+		serverMemory: string,
+		emptyServerShutdownMinutes: number | null
+	) {
 		super();
-		let shutdownMinutes = Config.EMPTY_SERVER_SHUTDOWN_MINUTES;
-		if (shutdownMinutes)
+
+		this.serverPath = serverPath;
+		this.serverJarFileName = serverJarFileName;
+		this.serverMemory = serverMemory;
+
+		if (emptyServerShutdownMinutes)
 			this.emptyServerTimer = new CancellableTimeout(() => {
-				console.log(`Server has been empty for ${shutdownMinutes} minutes. Shutting down...`);
+				console.log(`Server has been empty for ${emptyServerShutdownMinutes} minutes. Shutting down...`);
 				this.stop();
-			}, Number(Config.EMPTY_SERVER_SHUTDOWN_MINUTES) * 60 * 1000);
+			}, emptyServerShutdownMinutes * 60 * 1000);
 	}
 
 	private setServerStatus(serverStatus: ServerStatus, gameDigQuery?: QueryResult) {
@@ -142,22 +155,38 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 
 		this.setServerStatus(ServerStatus.BootingUp);
 
-		process.chdir(Config.SERVER_PATH!);
+		process.chdir(this.serverPath!);
 
 		const javaArgs: string[] = [
-			`-Xmx${Config.SERVER_MEMORY}`,
-			`-Xms${Config.SERVER_MEMORY}`,
+			`-Xmx${this.serverMemory}`,
+			`-Xms${this.serverMemory}`,
 			"-jar",
-			Config.SERVER_JAR_FILE!,
+			this.serverJarFileName ? this.serverJarFileName : "server.jar",
 			"nogui",
 		];
 
 		const minecraftServerProcess: ChildProcess = spawn("java", javaArgs);
 
-		this.minecraftServerMessager?.destroy();
-		this.minecraftServerMessager = new MinecraftServerMessager();
+		const propertiesPath = path.resolve(this.serverPath ?? ".", "server.properties");
+		const properties = PropertiesReader(propertiesPath);
 
-		this.minecraftServerMessager.on("serverInformation", (gameDigQuery: QueryResult) => {
+		const rconEnabled = properties.get("enable-rcon") === true;
+		const rconPort = properties.get("rcon.port");
+		const rconPassword = String(properties.get("rcon.password"));
+
+		if (rconEnabled && rconPassword != "") {
+			this.minecraftServerMessager = new MinecraftServerMessager(
+				"localhost",
+				rconPort ? Number(rconPort) : 25575,
+				rconPassword
+			);
+		} else {
+			console.warn(
+				"Please set enable-rcon in your server.properties to true and rcon.password to something. The server will not be able to stop via commands and messages from discord will not show in game otherwise."
+			);
+		}
+
+		this.minecraftServerMessager?.on("serverInformation", (gameDigQuery: QueryResult) => {
 			this.setServerStatus(this.serverStatus, gameDigQuery);
 		});
 
@@ -188,7 +217,7 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 		});
 
 		try {
-			const gameDigQuery = await this.minecraftServerMessager.start();
+			const gameDigQuery = await this.minecraftServerMessager?.start();
 			this.setServerStatus(ServerStatus.Up, gameDigQuery);
 		} catch (error) {
 			throw error;

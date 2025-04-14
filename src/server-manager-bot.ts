@@ -4,6 +4,7 @@ import type { PlayerEvent } from "./minecraft-server-output";
 import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
 import discordServerStatusWebhook from "./discord-server-status-webhook";
 import { Config } from "./config";
+import { copyFile } from "fs";
 
 // Define slash commands
 const commands = [
@@ -21,7 +22,12 @@ export default class {
 		partials: [Partials.Channel],
 	});
 
-	private minecraftServerProcess = new MinecraftServerProcess();
+	private minecraftServerProcess = new MinecraftServerProcess(
+		Config.SERVER_PATH ?? null,
+		Config.SERVER_JAR_FILE ?? null,
+		Config.SERVER_MEMORY as string,
+		Config.EMPTY_SERVER_SHUTDOWN_MINUTES ? Number(Config.EMPTY_SERVER_SHUTDOWN_MINUTES) : null
+	);
 	private discordMinecraftChatWebhook = new DiscordPlayerEventWebhook(
 		Config.CHAT_MESSAGES_CHANNEL_ID,
 		Config.CHAT_MESSAGES_WEBHOOK_URL,

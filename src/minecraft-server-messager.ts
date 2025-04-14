@@ -8,12 +8,12 @@ interface MessagerEmitter {
 }
 
 export default class MinecraftServerMessager extends TypedEventEmitter<MessagerEmitter> {
-	private rcon = new Rcon("localhost", 25575, "123");
+	private rcon: Rcon
 	private isInitialConnectionEstablished: boolean = false;
 	private isDestroyed: boolean = false;
 	private stopRetryLoop: RetryLoop<void>;
 
-	constructor() {
+	constructor(serverIp: string, rconPort: number, rconPassword: string) {
 		super();
 		this.stopRetryLoop = new RetryLoop(
 			() =>
@@ -30,6 +30,7 @@ export default class MinecraftServerMessager extends TypedEventEmitter<MessagerE
 				}),
 			3000
 		);
+		this.rcon = new Rcon(serverIp, rconPort, rconPassword);
 	}
 
 	public start(): Promise<QueryResult> {
