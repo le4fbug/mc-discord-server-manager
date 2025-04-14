@@ -53,12 +53,16 @@ function getConfigValue(key: string): string | undefined {
 	const propertiesKey = toKebabCase(key);
 
 	// Check .env first
-	if (process.env[propertiesKey] !== undefined) return process.env[propertiesKey];
+	console.log(process.env[propertiesKey]);
+	if (process.env[propertiesKey] !== "" && process.env[propertiesKey] !== undefined) return process.env[propertiesKey];
+	console.log('underinfeddfafsdf')
 
 	// Try .properties using lower-case dash format (e.g., SERVER_PATH -> server-path)
 	const value = properties.get(propertiesKey);
+	console.log(value)
+	console.log(propertiesKey);
 
-	return typeof value === "string" ? value : undefined;
+	return value ? String(value) : undefined;
 }
 
 // Generate the Config object dynamically
