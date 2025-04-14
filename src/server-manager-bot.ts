@@ -72,6 +72,18 @@ export default class {
 			try {
 				console.log("Registering slash commands...");
 
+				if (!Config.CLIENT_ID) {
+					console.error(
+						"Commands could not be registerd as Discord client id not provided. Please set in client-id in bot.properties."
+					);
+				}
+				if (!Config.GUILD_ID) {
+					console.error(
+						"Commands could not be registerd as Discord guild id not provided. Please set in guild-id in bot.properties."
+					);
+				}
+				if (!Config.CLIENT_ID || !Config.GUILD_ID) process.exit(1);
+
 				await rest.put(Routes.applicationGuildCommands(Config.CLIENT_ID as string, Config.GUILD_ID as string), {
 					body: commands,
 				});
@@ -125,7 +137,9 @@ export default class {
 
 					await interaction.editReply("Server is now up.");
 				} catch (error) {
-					await interaction.editReply(`Failed to start server: ${error instanceof Error ? error.message : error}`);
+					await interaction.editReply(
+						`Failed to start server: ${error instanceof Error ? error.message : error}`
+					);
 				}
 			}
 
@@ -189,6 +203,10 @@ export default class {
 		process.on("exit", async () => this.serverStatusWebhook.destroy());
 
 		// Login to Discord with the token
-		this.client.login(Config.TOKEN as string);
+		if (Config.TOKEN) this.client.login(Config.TOKEN as string);
+		else {
+			console.error("Bot can not log in as no discord token provided. Please set token property.");
+			process.exit(1);
+		}
 	}
 }
