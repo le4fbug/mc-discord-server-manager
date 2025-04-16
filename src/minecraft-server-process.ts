@@ -267,7 +267,7 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 	}
 
 	public sendCommand(command: string): Promise<string> {
-		return this.minecraftServerMessager ? this.minecraftServerMessager.sendCommand(command) : Promise.reject();
+		return this.minecraftServerMessager ? this.minecraftServerMessager.sendCommand(command) : Promise.reject("Server is not running.");
 	}
 
 	public isServerRunning(): boolean {

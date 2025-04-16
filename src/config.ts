@@ -28,7 +28,36 @@ const CONFIG_KEYS = [
 	"SERVER_MAX_MEMORY",
 	"SERVER_MIN_MEMORY",
 	"EMPTY_SERVER_SHUTDOWN_MINUTES",
+	"ADMIN_ROLE_IDS",
+	"ADMIN_USER_IDS",
 ];
+
+interface ConfigType {
+	TOKEN?: string;
+	CLIENT_ID?: string;
+	GUILD_ID?: string;
+	SERVER_STATUS_WEBHOOK_URL?: string;
+	SERVER_STATUS_CHANNEL_ID?: string;
+	CHAT_MESSAGES_WEBHOOK_URL?: string;
+	CHAT_MESSAGES_CHANNEL_ID?: string;
+	DEATH_MESSAGES_WEBHOOK_URL?: string;
+	DEATH_MESSAGES_CHANNEL_ID?: string;
+	ACHIEVEMENT_MESSAGES_WEBHOOK_URL?: string;
+	ACHIEVEMENT_MESSAGES_CHANNEL_ID?: string;
+	JOIN_MESSAGES_WEBHOOK_URL?: string;
+	JOIN_MESSAGES_CHANNEL_ID?: string;
+	LEAVE_MESSAGES_WEBHOOK_URL?: string;
+	LEAVE_MESSAGES_CHANNEL_ID?: string;
+	SERVER_PATH?: string;
+	SERVER_JAR_FILE?: string;
+	SERVER_MAX_MEMORY?: string;
+	SERVER_MIN_MEMORY?: string;
+	EMPTY_SERVER_SHUTDOWN_MINUTES?: string;
+
+	// Added permission-related keys with specific array types
+	ADMIN_ROLE_IDS: string[];
+	ADMIN_USER_IDS: string[];
+}
 
 dotenv.config();
 
@@ -61,8 +90,21 @@ function getConfigValue(key: string): string | undefined {
 	return value ? String(value) : undefined;
 }
 
-// Generate the Config object dynamically
-export const Config = Object.fromEntries(CONFIG_KEYS.map((key) => [key, getConfigValue(key)])) as Record<
-	(typeof CONFIG_KEYS)[number],
-	string | undefined
->;
+const parsedConfig = CONFIG_KEYS.reduce((acc, key) => {
+	const value = getConfigValue(key);
+	acc[key] = value;
+	return acc;
+}, {} as Record<string, string | undefined>);
+
+// Handle the parsing for ALLOWED_ROLE_IDS and ALLOWED_USER_IDS
+const Config: ConfigType = {
+	...parsedConfig,
+	ADMIN_ROLE_IDS: parsedConfig.ADMIN_ROLE_IDS
+		? parsedConfig.ADMIN_ROLE_IDS.split(",").map((id) => id.trim())
+		: [],
+	ADMIN_USER_IDS: parsedConfig.ADMIN_USER_IDS
+		? parsedConfig.ADMIN_USER_IDS.split(",").map((id) => id.trim())
+		: [],
+};
+
+export default Config;

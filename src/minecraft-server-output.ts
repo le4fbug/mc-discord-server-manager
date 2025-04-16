@@ -26,6 +26,9 @@ export default class extends TypedEventEmitter<ServerOutputEmitter> {
 	}
 
 	private parseLine(line: string) {
+		// Remove Rcon command inputs from getting out
+		if (line.includes("[Rcon]")) return;
+
 		// Chat messages
 		const chatMatch = line.match(/<([A-Za-z0-9_]+)> (.+)/);
 		if (chatMatch) {

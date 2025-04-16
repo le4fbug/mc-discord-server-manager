@@ -1,10 +1,18 @@
-import { Client, GatewayIntentBits, Partials, EmbedBuilder, REST, Routes, SlashCommandBuilder } from "discord.js";
+import {
+	Client,
+	GatewayIntentBits,
+	Partials,
+	EmbedBuilder,
+	REST,
+	Routes,
+	SlashCommandBuilder,
+	CommandInteraction,
+} from "discord.js";
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
 import type { PlayerEvent } from "./minecraft-server-output";
 import DiscordPlayerEventWebhook from "./discord-player-event-webhook";
 import discordServerStatusWebhook from "./discord-server-status-webhook";
-import { Config } from "./config";
-import { copyFile } from "fs";
+import Config from "./config";
 
 // Define slash commands
 const commands = [
@@ -13,7 +21,37 @@ const commands = [
 	new SlashCommandBuilder().setName("status").setDescription("Check the Minecraft server status"),
 	new SlashCommandBuilder().setName("logs").setDescription("View recent Minecraft server logs"),
 	new SlashCommandBuilder().setName("help").setDescription("Show all available commands"),
+	new SlashCommandBuilder()
+		.setName("send")
+		.setDescription("Send a command to the Minecraft server")
+		.addStringOption((option) => option.setName("command").setDescription("The command to send").setRequired(true)),
 ].map((command) => command.toJSON());
+
+function isAuthorized(interaction: CommandInteraction): boolean {
+	const userId = interaction.user.id;
+	if (Config.ADMIN_USER_IDS.includes(userId)) return true;
+
+	const member = interaction.member;
+	if (!member || !member.roles) return false;
+
+	if (Array.isArray(member.roles)) {
+		return member.roles.some((roleId) => Config.ADMIN_ROLE_IDS.includes(roleId));
+	}
+
+	const roleIds = Array.from(member.roles.cache.keys());
+	return roleIds.some((roleId) => Config.ADMIN_ROLE_IDS.includes(roleId));
+}
+
+function minecraftToDiscord(text: string): string {
+	return text
+		.replace(/§[0-9a-f]/gi, "") // Strip color codes
+		.replace(/§l/gi, "**") // Bold
+		.replace(/§o/gi, "*") // Italic
+		.replace(/§n/gi, "__") // Underline
+		.replace(/§m/gi, "~~") // Strikethrough
+		.replace(/§r/gi, "") // Reset (no formatting in Discord)
+		.replace(/\n/g, "\n"); // Preserve newlines
+}
 
 export default class {
 	// Create a new client instance
@@ -185,6 +223,27 @@ export default class {
 					.setTimestamp();
 
 				interaction.reply({ embeds: [helpEmbed] });
+			} else if (commandName === "send") {
+				if (!isAuthorized(interaction)) {
+					await interaction.reply({
+						content: "You do not have permission to use this command.",
+						flags: 64, // Only show for command user
+					});
+					return;
+				}
+
+				const commandOption = interaction.options.get("command", true);
+
+				try {
+					const response = await this.minecraftServerProcess.sendCommand(commandOption.value as string);
+					if (response) await interaction.reply(`Command sent.\n\`\`\`${minecraftToDiscord(response)}\`\`\``);
+					else await interaction.reply(`Command sent.`);
+				} catch (error) {
+					await interaction.reply({
+						content: `Failed to send command: ${error instanceof Error ? error.message : error}`,
+						flags: 64, // Only show for command user
+					});
+				}
 			}
 		});
 

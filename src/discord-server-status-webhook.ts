@@ -1,7 +1,6 @@
 import { EmbedBuilder, WebhookClient, type APIMessage, type ColorResolvable } from "discord.js";
 import { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
-import { Config } from "./config";
-import { stat } from "fs";
+import Config from "./config";
 
 export default class {
 	private webhookClient: WebhookClient | null = null;
