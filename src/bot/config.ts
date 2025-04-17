@@ -83,7 +83,8 @@ function getConfigValue(key: string): string | undefined {
 	const propertiesKey = toKebabCase(key);
 
 	// Check .env first
-	if (process.env[propertiesKey] !== "" && process.env[propertiesKey] !== undefined) return process.env[propertiesKey];
+	if (process.env[propertiesKey] !== "" && process.env[propertiesKey] !== undefined)
+		return process.env[propertiesKey];
 	// Try .properties using lower-case dash format (e.g., SERVER_PATH -> server-path)
 	const value = properties.get(propertiesKey);
 
@@ -99,12 +100,8 @@ const parsedConfig = CONFIG_KEYS.reduce((acc, key) => {
 // Handle the parsing for ALLOWED_ROLE_IDS and ALLOWED_USER_IDS
 const Config: ConfigType = {
 	...parsedConfig,
-	ADMIN_ROLE_IDS: parsedConfig.ADMIN_ROLE_IDS
-		? parsedConfig.ADMIN_ROLE_IDS.split(",").map((id) => id.trim())
-		: [],
-	ADMIN_USER_IDS: parsedConfig.ADMIN_USER_IDS
-		? parsedConfig.ADMIN_USER_IDS.split(",").map((id) => id.trim())
-		: [],
+	ADMIN_ROLE_IDS: parsedConfig.ADMIN_ROLE_IDS ? parsedConfig.ADMIN_ROLE_IDS.split(",").map((id) => id.trim()) : [],
+	ADMIN_USER_IDS: parsedConfig.ADMIN_USER_IDS ? parsedConfig.ADMIN_USER_IDS.split(",").map((id) => id.trim()) : [],
 };
 
 export default Config;

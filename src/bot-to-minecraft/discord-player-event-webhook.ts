@@ -1,5 +1,5 @@
-import { Client, WebhookClient } from "discord.js";
-import type { PlayerEvent } from "./minecraft-server-output";
+import { WebhookClient } from "discord.js";
+import type { PlayerEvent } from "../minecraft/minecraft-server-output";
 
 const referencePlayer = "_player";
 

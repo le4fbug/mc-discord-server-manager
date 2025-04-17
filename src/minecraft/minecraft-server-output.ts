@@ -1,6 +1,6 @@
 import { Readable } from "stream";
 import readline from "readline";
-import TypedEventEmitter from "./util/typed-event-emitter";
+import TypedEventEmitter from "../util/typed-event-emitter";
 
 export interface PlayerEvent {
 	player: string;

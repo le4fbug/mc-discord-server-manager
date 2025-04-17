@@ -1,6 +1,6 @@
 import net from "net";
 import { Buffer } from "buffer";
-import RetryLoop from "./util/retry-loop";
+import RetryLoop from "../util/retry-loop";
 
 enum RconPacketType {
 	AUTH = 3,

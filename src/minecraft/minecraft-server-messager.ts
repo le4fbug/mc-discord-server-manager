@@ -1,14 +1,14 @@
-import TypedEventEmitter from "./util/typed-event-emitter";
+import TypedEventEmitter from "../util/typed-event-emitter";
 import { GameDig, type QueryResult } from "gamedig";
 import Rcon from "./rcon";
-import RetryLoop from "./util/retry-loop";
+import RetryLoop from "../util/retry-loop";
 
 interface MessagerEmitter {
 	serverInformation: (serverInformation: QueryResult) => void;
 }
 
 export default class MinecraftServerMessager extends TypedEventEmitter<MessagerEmitter> {
-	private rcon: Rcon
+	private rcon: Rcon;
 	private isInitialConnectionEstablished: boolean = false;
 	private isDestroyed: boolean = false;
 	private stopRetryLoop: RetryLoop<void>;
