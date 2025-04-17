@@ -6,7 +6,7 @@ import TypedEventEmitter from "./util/typed-event-emitter";
 import CancellableTimeout from "./util/cancellable-timeout";
 import PropertiesReader from "properties-reader";
 import path from "path";
-import fs from 'fs';
+import fs from "fs";
 
 export interface DiscordMessage {
 	username: string;
@@ -146,7 +146,10 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 
 		if (this.serverStatus === ServerStatus.SchedulingShutdown) {
 			this.setServerStatus(ServerStatus.BootingUp);
-			throw new Error("Cancelled shutdown. Continuing with boot.");
+			let currentStatus = await this.waitForNextServerStatus();
+			if (currentStatus !== ServerStatus.Up)
+				throw new Error("Another command stopped the server from booting up.");
+			return;
 		}
 
 		if (this.serverStatus === ServerStatus.ShuttingDown) {
@@ -160,13 +163,17 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 		this.setServerStatus(ServerStatus.BootingUp);
 
 		if (this.serverPath) process.chdir(this.serverPath);
-	
+
 		let javaArgs: string[] = [];
 		const jarFileName = this.serverJarFileName ? this.serverJarFileName : "server.jar";
-		const jarFilePath = path.resolve(this.serverPath ?? ".", jarFileName)
+		const jarFilePath = path.resolve(this.serverPath ?? ".", jarFileName);
 		const doesJarFileExist = fs.existsSync(jarFilePath);
-		if (!doesJarFileExist) throw new Error(jarFilePath + " does not exist. Please check the server-path and server-jar-file is correct in bot properties.");
-			
+		if (!doesJarFileExist)
+			throw new Error(
+				jarFilePath +
+					" does not exist. Please check the server-path and server-jar-file is correct in bot properties."
+			);
+
 		if (this.serverMaxMemory) javaArgs.push(`-Xmx${this.serverMaxMemory}`);
 		if (this.serverMinMemory) javaArgs.push(`-Xms${this.serverMinMemory}`);
 		javaArgs.push("-jar");
@@ -218,10 +225,11 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 				this.minecraftServerMessager?.destroy();
 				this.minecraftServerMessager = null;
 				this.setServerStatus(ServerStatus.Down);
-				if (code == 0)
-					reject(new Error("Minecraft server shut down during boot up."));
-				else
-					reject(new Error("Minecraft server crashed during boot up."));
+				if (code == 0) reject(new Error("Minecraft server shut down during boot up."));
+				else reject(new Error("Minecraft server crashed during boot up."));
+			});
+			this.waitForNextServerStatus().then((currentStatus) => {
+				if (currentStatus !== ServerStatus.Up) reject("Another command stopped the server from starting.");
 			});
 		});
 
@@ -249,7 +257,7 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 			this.setServerStatus(ServerStatus.SchedulingShutdown);
 			// Wait for the server to fully boot up if it's in the BootingUp state
 			let currentStatus = await this.waitForNextServerStatus();
-			if (currentStatus !== ServerStatus.Up) throw new Error("Canceled shutdown because server did not boot up.");
+			if (currentStatus !== ServerStatus.Up) throw new Error("Another command stopped server shutdown.");
 		}
 
 		this.setServerStatus(ServerStatus.ShuttingDown);
@@ -257,7 +265,12 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 		if (this.minecraftServerMessager) {
 			try {
 				await this.minecraftServerMessager.sendStop();
-				return "Server successfully shut down.";
+				const serverStatus = await this.waitForNextServerStatus();
+				if (serverStatus === ServerStatus.Down) {
+					return "Server successfully shut down.";
+				} else {
+					throw new Error("Another command stopped server shutdown.");
+				}
 			} catch (error) {
 				throw new Error("Something went wrong with rcon stop command.");
 			}
@@ -267,7 +280,9 @@ export default class extends TypedEventEmitter<ServerProcessEmitter> {
 	}
 
 	public sendCommand(command: string): Promise<string> {
-		return this.minecraftServerMessager ? this.minecraftServerMessager.sendCommand(command) : Promise.reject("Server is not running.");
+		return this.minecraftServerMessager
+			? this.minecraftServerMessager.sendCommand(command)
+			: Promise.reject("Server is not running.");
 	}
 
 	public isServerRunning(): boolean {

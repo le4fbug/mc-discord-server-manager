@@ -7,6 +7,7 @@ import {
 	Routes,
 	SlashCommandBuilder,
 	CommandInteraction,
+	MessageFlags,
 } from "discord.js";
 import MinecraftServerProcess, { ServerStatus, type ServerStatusInformation } from "./minecraft-server-process";
 import type { PlayerEvent } from "./minecraft-server-output";
@@ -170,7 +171,6 @@ export default class {
 			if (commandName === "start") {
 				try {
 					await interaction.deferReply(); // Defers the response (gives you more time)
-
 					await this.minecraftServerProcess.start();
 
 					await interaction.editReply("Server is now up.");
@@ -188,9 +188,11 @@ export default class {
 
 					await this.minecraftServerProcess.stop();
 
-					await interaction.editReply("Server successfully shutdown.");
+					await interaction.editReply("Server has shutdown.");
 				} catch (error) {
-					await interaction.editReply(`Failed to stop server: ${error}`);
+					await interaction.editReply(
+						`Failed to stop server: ${error instanceof Error ? error.message : error}`
+					);
 				}
 			}
 
@@ -227,7 +229,7 @@ export default class {
 				if (!isAuthorized(interaction)) {
 					await interaction.reply({
 						content: "You do not have permission to use this command.",
-						flags: 64, // Only show for command user
+						flags: MessageFlags.Ephemeral,
 					});
 					return;
 				}
@@ -241,7 +243,7 @@ export default class {
 				} catch (error) {
 					await interaction.reply({
 						content: `Failed to send command: ${error instanceof Error ? error.message : error}`,
-						flags: 64, // Only show for command user
+						flags: MessageFlags.Ephemeral, // Only show for command user
 					});
 				}
 			}
